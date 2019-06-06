@@ -1,0 +1,7 @@
+[package]
+name = "ja2ps"
+version = "0.1.0"
+authors = ["baal"]
+edition = "2018"
+
+[dependencies]
