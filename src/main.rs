@@ -40,13 +40,22 @@ fn escape_ps_string(s: &str) -> String {
 		} else if ch.is_control() {
 			ret.push_str("??");
 		} else {
-			if let Some(cm) = cid_mapping_list.into_iter().find(|x| x.unicodes.iter().any(|&u| u == ch as u32)) {
-				if cm.cid <= 0xFFFF {
-					ret.push_str(&format!("\\{:03o}", (cm.cid >> 8) & 0xFF));
-					ret.push_str(&format!("\\{:03o}", cm.cid & 0xFF));
-				} else {
-					ret.push_str("??");
+			let mut cid: u32 = 0;
+			for m in cid_mapping_list {
+				let uc = ch as u32;
+				match m {
+					CIDMapping::Pair(c) => if c.utf32 == uc { cid = c.cid }
+					CIDMapping::Range(r) => if r.begin_utf32 <= uc && uc <= r.end_utf32 {
+						cid = r.cid + (uc - r.begin_utf32)
+					}
+				};
+				if cid != 0 {
+					break;
 				}
+			}
+			if 0 < cid && cid <= 0xFFFF {
+				ret.push_str(&format!("\\{:03o}", (cid >> 8) & 0xFF));
+				ret.push_str(&format!("\\{:03o}", cid & 0xFF));
 			} else {
 				ret.push_str("??");
 			}
@@ -58,7 +67,7 @@ fn escape_ps_string(s: &str) -> String {
 fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<(), io::Error> {
 
 	let stdin = io::stdin();
-	let r: io::BufReader<Box<Read>> = io::BufReader::new(
+	let r: io::BufReader<Box<dyn Read>> = io::BufReader::new(
 		match in_file_path {
 			Some(path) => Box::new(File::open(path)?),
 			None => Box::new(stdin.lock()),
@@ -66,7 +75,7 @@ fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<
 	);
 
 	let stdout = io::stdout();
-	let mut w: io::BufWriter<Box<Write>> = io::BufWriter::new(
+	let mut w: io::BufWriter<Box<dyn Write>> = io::BufWriter::new(
 		match out_file_path {
 			Some(path) => Box::new(File::create(path)?),
 			None => Box::new(stdout.lock()),
