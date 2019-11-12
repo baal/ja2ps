@@ -3,12 +3,10 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
+use cidmap_ja::Cidmap;
+
 mod font;
 use font::FontMetrics;
-
-mod cidmap;
-use cidmap::CIDMapping;
-use cidmap::make_cid_mapping_list;
 
 // A4 595x842(pt) 72dpi
 const PAGE_WIDTH: u32 = 595;
@@ -24,13 +22,7 @@ const PADDING_RIGHT: u32 = 20;
 const PADDING_BOTTOM: u32 = 20;
 const PADDING_LEFT: u32 = 20;
 
-static mut CID_MAPPING_LIST: Option<Vec<CIDMapping>> = None;
-
-fn escape_ps_string(s: &str) -> String {
-
-	let cid_mapping_list = unsafe {
-		CID_MAPPING_LIST.as_ref().unwrap()
-	};
+fn escape_ps_string(cidmap: &Cidmap, s: &str) -> String {
 
 	let mut ret = String::new();
 	for ch in s.chars() {
@@ -40,19 +32,7 @@ fn escape_ps_string(s: &str) -> String {
 		} else if ch.is_control() {
 			ret.push_str("??");
 		} else {
-			let mut cid: u32 = 0;
-			for m in cid_mapping_list {
-				let uc = ch as u32;
-				match m {
-					CIDMapping::Pair(c) => if c.utf32 == uc { cid = c.cid }
-					CIDMapping::Range(r) => if r.begin_utf32 <= uc && uc <= r.end_utf32 {
-						cid = r.cid + (uc - r.begin_utf32)
-					}
-				};
-				if cid != 0 {
-					break;
-				}
-			}
+			let cid: u32 = cidmap.get_cid(ch);
 			if 0 < cid && cid <= 0xFFFF {
 				ret.push_str(&format!("\\{:03o}", (cid >> 8) & 0xFF));
 				ret.push_str(&format!("\\{:03o}", cid & 0xFF));
@@ -84,6 +64,8 @@ fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<
 
 	w.write(b"%!PS\n")?;
 	w.write(b"gsave\n")?;
+
+	let cidmap = Cidmap::new();
 
 	let font = FontMetrics {
 		size: 12,
@@ -153,7 +135,7 @@ fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<
 			}
 			w.write(format!("{x} {y} moveto ", x = x, y = y).as_bytes())?;
 			w.write(b" (")?;
-			w.write(escape_ps_string(&buf).as_bytes())?;
+			w.write(escape_ps_string(&cidmap, &buf).as_bytes())?;
 			w.write(b") show\n")?;
 			rows += 1;
 			if rows >= max_rows {
@@ -171,11 +153,6 @@ fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<
 }
 
 fn main() -> Result<(), io::Error> {
-
-	let cid_mapping_list = make_cid_mapping_list()?;
-	unsafe {
-		CID_MAPPING_LIST = Some(cid_mapping_list);
-	}
 
 	let mut args = env::args().skip(1);
 	let in_file_path = args.next();

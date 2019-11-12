@@ -1,7 +1,13 @@
 [package]
 name = "ja2ps"
 version = "0.1.0"
-authors = ["baal"]
+authors = ["baal <baal@m-oz.com>"]
 edition = "2018"
 
 [dependencies]
+cidmap-ja = { path = "libcidmap-ja" }
+
+[workspace]
+members = [
+	"libcidmap-ja",
+]
