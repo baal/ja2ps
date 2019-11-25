@@ -5,6 +5,9 @@ use std::io::prelude::*;
 
 use cidmap_ja::Cidmap;
 
+mod error;
+use error::CliError;
+
 mod font;
 use font::FontMetrics;
 
@@ -36,7 +39,7 @@ fn escape_ps_string(cidmap: &Cidmap, s: &str) -> String {
     ret
 }
 
-fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<(), io::Error> {
+fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<(), CliError> {
     let stdin = io::stdin();
     let r: io::BufReader<Box<dyn Read>> = io::BufReader::new(match in_file_path {
         Some(path) => Box::new(File::open(path)?),
@@ -157,7 +160,7 @@ fn ja2ps(in_file_path: Option<String>, out_file_path: Option<String>) -> Result<
     Ok(())
 }
 
-fn main() -> Result<(), io::Error> {
+fn main() -> Result<(), CliError> {
     let mut args = env::args().skip(1);
     let in_file_path = args.next();
     let out_file_path = args.next();
